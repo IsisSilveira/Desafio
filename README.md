@@ -8,18 +8,18 @@ Importar os dados
 
 ```
 qiime tools import \
-  --type "SampleData[SequencesWithQuality]" \
-  --input-format SingleEndFastqManifestPhred33V2 \
-  --input-path ./manifest.tsv \
-  --output-path ./demux_seqs.qza
+  --type "SampleData[SequencesWithQuality]" \         #tipo dos dados importados: sequências com pontuação de qualidade (fastq)
+  --input-format SingleEndFastqManifestPhred33V2 \    #formato do input: single end (as direções das reads devem ser forward OU reverse) manifest format (Phred 33)
+  --input-path ./manifest.tsv \                       #input: o arquivo manifest, que contém os caminhos de todos os fastq
+  --output-path ./demux_seqs.qza                      #output: os fastq transformados em um artefato do qiime
   ```
 
 Visualizar os dados importados
 
 ```
-qiime demux summarize \
-  --i-data ./demux_seqs.qza \
-  --o-visualization ./demux_seqs.qzv
+qiime demux summarize \               #comando que inspeciona as sequências e sua profundidade, fornecendo informações sobre número de seqs em cada amostra e qualidade
+  --i-data ./demux_seqs.qza \         #input: artefato do qiime relativo aos fastq
+  --o-visualization ./demux_seqs.qzv  #output: artefato para visualização em view.qiime2.org
   ```
 
 A visualização mostrou gráfico (box plot) de qualidade com excelente pontuação (quality_plot.png). A parte mais baixa da box da posição 251 tinha qs=13 (apesar da mediana ser qs=37), por isso, inicialmente considerei trimar apenas a base 251. Entretanto, é bastante recomendado que se faça a trimagem de pelo menos os últimos 10 nt (que geralmente tem qualidade relativamente menor no sequenciamento Illumina). 
@@ -61,10 +61,10 @@ O método usado foi `denoise-single` - ele toma as sequências pós demultiplexa
   ```
   qiime dada2 denoise-single \
   --i-demultiplexed-seqs ./demux_seqs.qza \
-  --p-trunc-len 241 \                        
-  --o-table ./dada2_table241.qza \
-  --o-representative-sequences ./dada2_rep_set241.qza \
-  --o-denoising-stats ./dada2_stats241.qza
+  --p-trunc-len 241 \                                         #as sequências serão truncadas na posição 241 na extremidade 3'             
+  --o-table ./dada2_table241.qza \                            #output: feature table
+  --o-representative-sequences ./dada2_rep_set241.qza \       #output: tabela com as sequências únicas que representam as features da tabela dada2_table241.qza
+  --o-denoising-stats ./dada2_stats241.qza                    #output: relatório do resultado da redução de ruído
   ```
 
 Visualizar o relatório e estatísticas do denoising:
@@ -87,14 +87,14 @@ qiime metadata tabulate \
 
 #### 3) Identificação taxonômica
 
-Usando classificador treinado Greengenes 13_8 99% OTUs da região 515F/806R (genes de 16s clusterizados a 99% de semelhança, com o seguinte par de primers: forward a partir da posição 515 e reverse na posição 806, ou seja, abrangem a região V4 do gene 16s). Nessa etapa, QIIME2 trabalha atrvés da scikit-learn, que pede uso do classificador treinado, já que se trata de uma biblioteca de machine learning.
+Usando classificador Naive Bayes treinado com Greengenes 13_8 99% OTUs da região 515F/806R (genes de 16s clusterizados a 99% de semelhança, com o seguinte par de primers: forward a partir da posição 515 e reverse na posição 806, ou seja, abrangem a região V4 do gene 16s). Nessa etapa, QIIME2 trabalha atrvés da scikit-learn, que pede uso do classificador treinado, já que se trata de uma biblioteca de machine learning.
 
 OBS: Tentei usar o SILVA, mas a execução do código não se completou, mostrando apenas a mensagem "killed" - acredito estar ligada à limitação da capacidade de processamento da máquina. Por isso usei o Greengenes treinado, mais leve.
 
   ```
-  qiime feature-classifier classify-sklearn \
-  --i-reads ./dada2_rep_set241.qza \
-  --i-classifier ./gg-13-8-99-515-806-nb-classifier.qza \
+  qiime feature-classifier classify-sklearn \                 #plugin do qiime para identificação taxonômica baseado no scikit-learn
+  --i-reads ./dada2_rep_set241.qza \                          #input: tabela das sequências únicas que representam as features, gerada com dada2
+  --i-classifier ./gg-13-8-99-515-806-nb-classifier.qza \     #input: classificador Naive Bayes treinado com Greengenes 13_8 99% região 515F/806R
   --o-classification ./taxonomy.qza
   ```
   
@@ -107,14 +107,14 @@ OBS: Tentei usar o SILVA, mas a execução do código não se completou, mostran
   --o-visualization ./taxonomy.qzv
   ```
 
-O método a seguir gera um gráfico de barras interativo que mostra a identificação taxonômica em cada amostra (visualizar o arquivo QZV em view.qiime2.org).
+O método a seguir gera um gráfico de barras interativo que mostra a identificação taxonômica em cada amostra (visualizar o arquivo taxa-bar-plots.qzv em view.qiime2.org).
 
   ```
   qiime taxa barplot \
-  --i-table dada2_table241.qza \
-  --i-taxonomy taxonomy.qza \
-  --m-metadata-file cmetadata.tsv \
-  --o-visualization taxa-bar-plots.qzv
+  --i-table dada2_table241.qza \    #input: feature table gerada pelo dada2
+  --i-taxonomy taxonomy.qza \       #input: tabela de identificação taxonômica gerada com scikit-learn 
+  --m-metadata-file cmetadata.tsv \   #metadata file com os IDs das amostras, quantidade de dias pós desmame e tempo (early/late)
+  --o-visualization taxa-bar-plots.qzv  #output: artefato do qiime para visualização interativa em view.qiime2.org
   ```
 
 
@@ -143,7 +143,7 @@ Gerar a visualização da tabela final (**final_table.tsv**)
 ```
 qiime metadata tabulate \
     --m-input-file trans_table.qza \
-    --o-visualization final_table.qzv #este output serve para visualização em view.qiime2.org da mesma tabela TSV
+    --o-visualization final_table.qzv   #este output serve para visualização em view.qiime2.org da mesma tabela TSV
 ```
 
 
